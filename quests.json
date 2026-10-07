@@ -1,0 +1,58 @@
+[
+  {
+    "id": "ori-01", "family": "orientation", "level": 1, "xp": 20, "biblio_id": 101,
+    "title": "Find it on the shelf",
+    "prompt": "Go to the shelf and find this book (the guide will tell you its title). Tell me the call number written on its spine label.",
+    "hint": "Open the record, check the copy details, and note the classification number before the author mark.",
+    "reflect": "How would you find a different book on the same subject next time?",
+    "verify": {"type": "callnumber", "params": {"biblio_id": 101}}
+  },
+  {
+    "id": "ori-02", "family": "orientation", "level": 1, "xp": 15,
+    "title": "Know the rules",
+    "prompt": "How many days can a student keep a borrowed book?",
+    "hint": "Ask the guide about library rules for students.",
+    "reflect": "Which library rule surprised you most?",
+    "verify": {"type": "answer", "params": {"accepted": ["14", "14 days", "fourteen", "fourteen days"]}}
+  },
+  {
+    "id": "dis-01", "family": "discovery", "level": 1, "xp": 25,
+    "title": "First search",
+    "prompt": "Search the catalogue for books on surveying. Give the title of any one book you find.",
+    "hint": "Try a single word such as 'surveying' rather than a long sentence.",
+    "reflect": "What word would you try next to find more results?",
+    "verify": {"type": "answer", "params": {"accepted": ["Surveying Volume 1", "Surveying and Levelling"]}}
+  },
+  {
+    "id": "il-01", "family": "information_literacy", "level": 2, "xp": 40,
+    "title": "Standards matter",
+    "prompt": "Which Indian Standard (IS number) covers the code of practice for plain and reinforced concrete?",
+    "hint": "Indian Standards are written as 'IS' followed by a number and a year. Look in the reference collection.",
+    "reflect": "Why might a standard be more reliable than a website for lab work?",
+    "verify": {"type": "answer", "params": {"accepted": ["IS 456", "IS456", "IS 456:2000", "IS 456 2000"]}}
+  },
+  {
+    "id": "ri-01", "family": "research_integrity", "level": 2, "xp": 40,
+    "title": "Cite it right",
+    "prompt": "Write a reference for any book you have borrowed, with author, title, place: publisher, and year.",
+    "hint": "Start with the author's surname, then initials, then the title, then place: publisher, then year.",
+    "reflect": "Why does a reference need the year of publication?",
+    "verify": {"type": "citation", "params": {"required": ["author", "year", "title", "publisher"]}}
+  },
+  {
+    "id": "read-01", "family": "reading_engagement", "level": 1, "xp": 30,
+    "title": "Borrow and return on time",
+    "prompt": "Borrow any book from the library and return it on or before its due date. Then tell me you are done.",
+    "hint": "The quest completes once Koha records the return on or before the due date.",
+    "reflect": "Was the book useful beyond your syllabus?",
+    "verify": {"type": "checkout_return"}
+  },
+  {
+    "id": "read-02", "family": "reading_engagement", "level": 1, "xp": 20,
+    "title": "Visit the reading room",
+    "prompt": "Spend some time in the reading room and tell me one thing you read there.",
+    "hint": "Any newspaper, magazine or book counts.",
+    "reflect": "Would you go back? Why?",
+    "verify": {"type": "self"}
+  }
+]

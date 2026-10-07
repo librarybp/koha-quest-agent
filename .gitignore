@@ -1,0 +1,6 @@
+# Secrets and local data: never upload
+.env
+*.db
+venv/
+__pycache__/
+*.pyc
