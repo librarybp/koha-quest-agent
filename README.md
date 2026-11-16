@@ -18,6 +18,9 @@ An LLM "Library Guide" inside the Koha OPAC offers optional learning quests. It 
 | `scripts/install_local.sh` | One-step install on the Koha PC: Python, service, and Ollama if the PC can run it |
 | `scripts/check_llm.py` | Checks the model: reachable, tool calling, speed |
 | `scripts/check_koha.py` | Read-only check of your Koha: API key, endpoints, permissions, field names |
+| `scripts/evaluate.py` | Technical evaluation: 24 cases against live Koha and a real model, scored automatically |
+| `scripts/make_figures.py` | Draws the evaluation figures (pass rates, tool-call frequency, response times) |
+| `scripts/summarise_ratings.py` | Summarises your manual ratings of the evaluation replies |
 | `tests/` | Mock Koha API; MCP boundary test (18 checks) and agent loop test (7 checks) |
 
 ## Requirements
@@ -64,6 +67,10 @@ python tests/test_agent.py       # login and agent loop with a fake model
 ```
 
 Runs the MCP server against a mock Koha API and checks tool scoping, privacy filtering, answer-key secrecy, verification rules, prompt-injection handling, opt-in/opt-out and department-score thresholds.
+
+## Evaluation
+
+See [EVALUATION.md](EVALUATION.md) to run the technical evaluation (`scripts/evaluate.py`) against your own Koha and a language model, and to summarise manual ratings.
 
 ## Safety design
 

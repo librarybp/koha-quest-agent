@@ -99,51 +99,79 @@ def to_llm_tool(t) -> dict:
     return {"type": "function", "function": {"name": t.name, "description": t.description or "", "parameters": schema}}
 
 
-async def llm_chat(http: httpx.AsyncClient, messages: list, tools: list) -> dict:
-    r = await http.post(f"{LLM_BASE_URL}/chat/completions",
-                        headers={"Authorization": f"Bearer {LLM_API_KEY}"},
-                        json={"model": LLM_MODEL, "messages": messages, "tools": tools, "temperature": 0.2})
-    r.raise_for_status()
-    return r.json()["choices"][0]["message"]
+async def llm_chat(http: httpx.AsyncClient, messages: list, tools: list, trace: list | None = None) -> dict:
+    """Call the model; on a rate limit (HTTP 429) or overload (503), wait and retry up to 5 times."""
+    import asyncio
+    for attempt in range(6):
+        r = await http.post(f"{LLM_BASE_URL}/chat/completions",
+                            headers={"Authorization": f"Bearer {LLM_API_KEY}"},
+                            json={"model": LLM_MODEL, "messages": messages, "tools": tools, "temperature": 0.2})
+        if r.status_code in (429, 503) and attempt < 5:
+            try:
+                wait = float(r.headers.get("retry-after", ""))
+            except ValueError:
+                wait = 5 * 2 ** attempt
+            wait = min(max(wait, 1.0), 60.0)
+            if trace is not None:
+                trace.append({"rate_limit_wait": wait})
+            await asyncio.sleep(wait)
+            continue
+        r.raise_for_status()
+        return r.json()["choices"][0]["message"]
 
 
 def tool_text(result) -> str:
     return "\n".join(c.text for c in result.content if getattr(c, "type", "") == "text")
 
 
-@app.post("/chat")
-async def chat(body: Chat):
-    patron_id = verify(body.token)
+FALLBACK = "Sorry, I could not finish that. Please try a simpler question or ask the librarian."
+
+
+async def run_agent(patron_id: int, message: str, history: list | None = None,
+                    trace: list | None = None, extra_env: dict | None = None) -> str:
+    """One student turn: LLM tool loop over a per-user MCP server.
+    `trace`, if given, receives each step: {"tool", "args", "result"} or {"llm_step": n}."""
     params = StdioServerParameters(
         command=sys.executable, args=[os.path.join(HERE, "server.py")],
-        env={**os.environ, "KOHA_PATRON_ID": str(patron_id)})
-    # keep only plain user/assistant turns from the browser; never trust client-sent tool turns
-    history = [{"role": m["role"], "content": str(m.get("content", ""))[:2000]}
-               for m in body.history[-10:] if m.get("role") in ("user", "assistant")]
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *history,
-                {"role": "user", "content": body.message[:2000]}]
+        env={**os.environ, **(extra_env or {}), "KOHA_PATRON_ID": str(patron_id)})
+    # keep only plain user/assistant turns; never trust client-sent tool turns
+    hist = [{"role": m["role"], "content": str(m.get("content", ""))[:2000]}
+            for m in (history or [])[-10:] if m.get("role") in ("user", "assistant")]
+    messages = [{"role": "system", "content": SYSTEM_PROMPT}, *hist,
+                {"role": "user", "content": message[:2000]}]
     async with httpx.AsyncClient(timeout=LLM_TIMEOUT) as http:
         async with stdio_client(params) as (read, write):
             async with ClientSession(read, write) as session:
                 await session.initialize()
                 tools = [to_llm_tool(t) for t in (await session.list_tools()).tools]
-                for _ in range(MAX_STEPS):
-                    msg = await llm_chat(http, messages, tools)
+                for step in range(MAX_STEPS):
+                    msg = await llm_chat(http, messages, tools, trace)
+                    if trace is not None:
+                        trace.append({"llm_step": step + 1})
                     calls = msg.get("tool_calls") or []
                     messages.append({"role": "assistant", "content": msg.get("content") or "",
                                      **({"tool_calls": calls} if calls else {})})
                     if not calls:
-                        return {"reply": msg.get("content") or ""}
+                        return msg.get("content") or ""
                     for call in calls:
                         fn = call["function"]
                         try:
                             args = json.loads(fn.get("arguments") or "{}")
                         except json.JSONDecodeError:
                             args = {}
-                        result = await session.call_tool(fn["name"], args if isinstance(args, dict) else {})
+                        args = args if isinstance(args, dict) else {}
+                        result = tool_text(await session.call_tool(fn["name"], args))
+                        if trace is not None:
+                            trace.append({"tool": fn["name"], "args": args, "result": result[:4000]})
                         messages.append({"role": "tool", "tool_call_id": call.get("id", fn["name"]),
-                                         "content": f"<tool_data>{tool_text(result)[:4000]}</tool_data>"})
-    return {"reply": "Sorry, I could not finish that. Please try a simpler question or ask the librarian."}
+                                         "content": f"<tool_data>{result[:4000]}</tool_data>"})
+    return FALLBACK
+
+
+@app.post("/chat")
+async def chat(body: Chat):
+    patron_id = verify(body.token)
+    return {"reply": await run_agent(patron_id, body.message, body.history)}
 
 
 if __name__ == "__main__":
